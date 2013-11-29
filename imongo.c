@@ -11,13 +11,15 @@
         }\
     }while(0)
 
-int64_t mongoread(const char *file_name, char *data) {
-  mongo conn[1];
-  int64_t len = 0;
-  int status = mongo_client( conn, "127.0.0.1", 27017 );
+static mongo g_conn[1];
+static gridfs gfs[1];
+
+int mongo_init_gfs(const char *server, int port)
+{
+  int status = mongo_client( g_conn, server, port );
 
   if( status != MONGO_OK ) {
-      switch ( conn->err ) {
+      switch ( g_conn->err ) {
         case MONGO_CONN_NO_SOCKET:  printf( "no socket\n" ); return -1;
         case MONGO_CONN_FAIL:       printf( "connection failed\n" ); return -1;
         case MONGO_CONN_NOT_MASTER: printf( "not master\n" ); return -1;
@@ -25,10 +27,21 @@ int64_t mongoread(const char *file_name, char *data) {
   }
 
   printf("connected ok\n");
+ 
+  gridfs_init( g_conn, "ctest", "fs", gfs );
 
-  gridfs gfs[1];
+  return 0;
+}
+
+int mongo_destroy_gfs()
+{
+  gridfs_destroy( gfs );
+  mongo_destroy( g_conn );
+}
+
+int64_t mongoread(const char *file_name, char *data) {
+  int64_t len = 0;
   gridfile gfile[1];
-  gridfs_init( conn, "ctest", "fs", gfs );
 
   if ((gridfs_find_filename( gfs, file_name, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
   {
@@ -39,9 +52,6 @@ int64_t mongoread(const char *file_name, char *data) {
   }
   else
     printf("file not found\n");
-
-  gridfs_destroy( gfs );
-  mongo_destroy( conn );
 
   return len;
 }

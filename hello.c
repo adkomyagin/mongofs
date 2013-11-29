@@ -3,14 +3,32 @@
 #include <string.h>
 #include <fuse.h>
 #include "imongo.h"
+#include <fuse_opt.h>
 
 static const char  *file_path      = "/hello.txt";
 static char   file_content[] = "Hello World!\n";
 static size_t file_size      = sizeof(file_content)/sizeof(char) - 1;
 
 static char new_file_path[] = "/dummy.dummy.dummy.dummy";
-//static char   new_file_content[] = "Hello World!\n";
-//static size_t new_file_size      = sizeof(new_file_content)/sizeof(char) - 1;
+
+/** options for fuse_opt.h */
+struct options {
+   char* server;
+   int port;
+} options;
+
+/** macro to define options */
+#define offsetof(type,field) __builtin_offsetof(type, field)
+#define TESTFS_OPT_KEY(t, p, v) { t, offsetof(struct options, p), v }
+
+static struct fuse_opt hello_opts[] =
+{
+    TESTFS_OPT_KEY("server=%s", server, 0),
+    TESTFS_OPT_KEY("port=%i", port, 0),
+
+    FUSE_OPT_END
+};
+
 
 static int
 hello_getattr(const char *path, struct stat *stbuf)
@@ -137,8 +155,6 @@ hello_fsync(const char *path, int isdatasync,
     return 0;
 }
 
-
-
 static struct fuse_operations hello_filesystem_operations = {
     .getattr = hello_getattr, /* To provide size, permissions, etc. */
     .open    = hello_open,    /* To enforce read-only access.       */
@@ -154,5 +170,33 @@ static struct fuse_operations hello_filesystem_operations = {
 int
 main(int argc, char **argv)
 {
-    return fuse_main(argc, argv, &hello_filesystem_operations, NULL);
+    //return fuse_main(argc, argv, &hello_filesystem_operations, NULL);
+    int ret;
+    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+
+    /* clear structure that holds our options */
+    options.server = "127.0.0.1";
+    options.port = 27017;
+
+    if (fuse_opt_parse(&args, &options, hello_opts, NULL) == -1)
+    {
+        printf("error parsing options\n");
+        return -1;
+    }
+
+    //connect gridfs
+    if (mongo_init_gfs(options.server, options.port) < 0)
+    {
+        printf("init gridfs failed\n");
+        return -1;
+    }
+
+    ret = fuse_main(args.argc, args.argv, &hello_filesystem_operations, NULL);
+
+    /** free arguments */
+    fuse_opt_free_args(&args);
+
+    mongo_destroy_gfs();
+
+    return ret;
 }
