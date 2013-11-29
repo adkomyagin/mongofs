@@ -80,7 +80,7 @@ hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     filler(buf, ".", NULL, 0);           /* Current directory (.)  */
     filler(buf, "..", NULL, 0);          /* Parent directory (..)  */
 
-    mongo_find_names(filler, buf);
+    mongo_find_names_distinct(filler, buf);
 
     return 0;
 }
@@ -108,6 +108,10 @@ static int
 hello_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     printf("write requested: %s, size: %d, offset: %d\n", path, size, offset);
+    if (offset != 0) //don't support partial writes yet
+        return -1;
+
+
 
     return size;
 }

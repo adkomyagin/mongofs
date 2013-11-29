@@ -56,6 +56,35 @@ int64_t mongo_file_exists(const char *file_name)
   return len;
 }
 
+int mongo_find_names_distinct( fuse_fill_dir_t filler, void *buf )
+{
+    bson b[1];
+    bson out[1];
+
+    bson_init( b );
+    bson_append_string( b, "distinct", "fs.files" );
+    bson_append_string( b, "key", "filename" );
+    bson_finish( b );
+
+    if (mongo_run_command( g_conn, "ctest", b, out ) != MONGO_OK)
+      return -1;
+
+    bson_destroy( b );
+
+    bson_iterator iterator[1], sub[1];
+
+    if ( bson_find( iterator, out, "values" )) {
+      bson_iterator_subiterator( iterator, sub );
+    }
+
+    while( bson_iterator_next(sub) )
+      filler(buf, bson_iterator_string( sub ), NULL, 0);
+
+    bson_destroy( out );
+
+    return 0;
+}
+
 int mongo_find_names( fuse_fill_dir_t filler, void *buf )
 {
   bson names[1];
