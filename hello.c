@@ -4,6 +4,7 @@
 #include <fuse.h>
 #include "imongo.h"
 #include <fuse_opt.h>
+#include <libgen.h>
 
 static const char  *file_path      = "/hello.txt";
 static char   file_content[] = "Hello World!\n";
@@ -33,21 +34,20 @@ static struct fuse_opt hello_opts[] =
 static int
 hello_getattr(const char *path, struct stat *stbuf)
 {
+    int64_t len;
+
     printf("file getattr: %s\n", path);
+    //printf("file basename: %s\n", basename(path));
 
     memset(stbuf, 0, sizeof(struct stat));
 
     if (strcmp(path, "/") == 0) { /* The root directory of our file system. */
         stbuf->st_mode = S_IFDIR | 0777;
         stbuf->st_nlink = 3;
-    } else if (strcmp(path, file_path) == 0) { /* The only file we have. */
+    } else if ((len = mongo_file_exists(basename(path))) != -1) { /* The file that we have. */
         stbuf->st_mode = S_IFREG | 0777;
         stbuf->st_nlink = 1;
-        stbuf->st_size = file_size;
-    } else if (strcmp(path, new_file_path) == 0) { /* The newly created file */
-        stbuf->st_mode = S_IFREG | 0777;
-        stbuf->st_nlink = 1;
-        stbuf->st_size = file_size;
+        stbuf->st_size = len;
     } else
         return -ENOENT;
 
@@ -57,20 +57,13 @@ hello_getattr(const char *path, struct stat *stbuf)
 static int
 hello_open(const char *path, struct fuse_file_info *fi)
 {
-    //if (strcmp(path, file_path) != 0) /* We only recognize one file. */
-    //    return -ENOENT;
+    if (mongo_file_exists(basename(path)) == -1) /* We only recognize files we have */
+        return -ENOENT;
 
     //if ((fi->flags & O_ACCMODE) != O_RDONLY) /* Only reading allowed. */
     //    return -EACCES;
 
     printf("file open: %s\n", path);
-
-    file_size = mongoread("file", file_content);
-    if (file_size >0)
-    {
-       file_content[file_size] = '\n';
-       file_size++;
-    }
 
     return 0;
 }
@@ -86,8 +79,8 @@ hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     filler(buf, ".", NULL, 0);           /* Current directory (.)  */
     filler(buf, "..", NULL, 0);          /* Parent directory (..)  */
-    filler(buf, file_path + 1, NULL, 0); /* The only file we have. */
-    filler(buf, new_file_path + 1, NULL, 0); /* The newly created file */
+
+    mongo_find_names(filler, buf);
 
     return 0;
 }
@@ -98,18 +91,7 @@ hello_read(const char *path, char *buf, size_t size, off_t offset,
 {
     printf("read requested: %s, size: %d, offset: %d\n", path, size, offset);
 
-    //if (strcmp(path, file_path) != 0)
-    //    return -ENOENT;
-
-    if (offset >= file_size) /* Trying to read past the end of file. */
-        return 0;
-
-    if (offset + size > file_size) /* Trim the read to the file size. */
-        size = file_size - offset;
-
-    memcpy(buf, file_content + offset, size); /* Provide the content. */
-
-    return size;
+    return mongo_read(basename(path), buf, size, offset);
 }
 
 static int
