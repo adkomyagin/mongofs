@@ -6,12 +6,6 @@
 #include <fuse_opt.h>
 #include <libgen.h>
 
-static const char  *file_path      = "/hello.txt";
-static char   file_content[] = "Hello World!\n";
-static size_t file_size      = sizeof(file_content)/sizeof(char) - 1;
-
-static char new_file_path[] = "/dummy.dummy.dummy.dummy";
-
 /** options for fuse_opt.h */
 struct options {
    char* server;
@@ -35,6 +29,7 @@ static int
 hello_getattr(const char *path, struct stat *stbuf)
 {
     int64_t len;
+    time_t ctime;
 
     printf("file getattr: %s\n", path);
     //printf("file basename: %s\n", basename(path));
@@ -44,12 +39,21 @@ hello_getattr(const char *path, struct stat *stbuf)
     if (strcmp(path, "/") == 0) { /* The root directory of our file system. */
         stbuf->st_mode = S_IFDIR | 0777;
         stbuf->st_nlink = 3;
-    } else if ((len = mongo_file_exists(basename(path))) != -1) { /* The file that we have. */
+    } else if ((len = mongo_file_exists_(basename(path), &ctime)) != -1) { /* The file that we have. */
         stbuf->st_mode = S_IFREG | 0777;
         stbuf->st_nlink = 1;
         stbuf->st_size = len;
+        stbuf->st_ctime = stbuf->st_mtime = ctime;
+        //char buff[20];
+        //strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&ctime));
+        //printf("CTIME: %s\n", buff);
     } else
         return -ENOENT;
+    /*{ // The file that we don't have. 
+        stbuf->st_mode = S_IFREG | 0777;
+        stbuf->st_nlink = 1;
+        stbuf->st_size = 0;
+    }*/
 
     return 0;
 }
@@ -99,7 +103,7 @@ hello_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
     printf("file create: %s\n", path);
 
-    strcpy(new_file_path, path);
+    mongo_write(basename(path), NULL, 0, 0);
 
     return 0;
 }
@@ -108,18 +112,16 @@ static int
 hello_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     printf("write requested: %s, size: %d, offset: %d\n", path, size, offset);
-    if (offset != 0) //don't support partial writes yet
-        return -1;
 
-
-
-    return size;
+    return mongo_write(basename(path), buf, size, offset);
 }
 
 static int
 hello_unlink(const char *path)
 {
     printf("file unlink: %s\n", path);
+
+    mongo_unlink(basename(path));
 
     return 0;
 }

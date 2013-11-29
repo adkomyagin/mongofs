@@ -43,12 +43,30 @@ int mongo_destroy_gfs()
 
 int64_t mongo_file_exists(const char *file_name)
 {
+  /*int64_t len = -1;
+  gridfile gfile[1];
+
+  if ((gridfs_find_filename( gfs, file_name, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+  {
+    len = gridfile_get_contentlength(gfile);
+  }
+  else
+    printf("file not found: %s\n", file_name);
+
+  return len;*/
+  return mongo_file_exists_(file_name, NULL);
+}
+
+int64_t mongo_file_exists_(const char *file_name, time_t *ctime)
+{
   int64_t len = -1;
   gridfile gfile[1];
 
   if ((gridfs_find_filename( gfs, file_name, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
   {
     len = gridfile_get_contentlength(gfile);
+    if (ctime != NULL)
+      *ctime = (time_t)gridfile_get_uploaddate(gfile)/1000;
   }
   else
     printf("file not found: %s\n", file_name);
@@ -126,7 +144,7 @@ int64_t mongo_read(const char *file_name, char *data, size_t size, off_t offset)
   int64_t len = 0;
   gridfile gfile[1];
 
-  if ((gridfs_find_filename( gfs, file_name, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+  if ((gridfs_find_filename( gfs, file_name, gfile ) == MONGO_OK) && (gridfile_exists( gfile ))) //sorts by uploadDate:-1
   {
     len = gridfile_get_contentlength(gfile);
 
@@ -145,4 +163,23 @@ int64_t mongo_read(const char *file_name, char *data, size_t size, off_t offset)
     printf("file not found\n");
 
   return len;
+}
+
+int mongo_unlink(const char *filename)
+{
+    return gridfs_remove_filename(gfs, filename);
+}
+
+int64_t mongo_write(const char *filename, const char *buf, size_t size, off_t offset)
+{
+    if (offset != 0) //don't support partial writes yet
+    {
+        printf("EASY BRO!\n");
+        return -1;
+    }
+
+    if (MONGO_OK == gridfs_store_buffer( gfs, buf, size, filename, "text/html", GRIDFILE_DEFAULT ))
+      return size;
+    else
+      return -1;
 }

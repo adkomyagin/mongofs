@@ -530,7 +530,7 @@ MONGO_EXPORT int gridfile_writer_init(gridfile *gfile, gridfs *gfs, const char *
   gridfile tmpFile;
 
   gfile->gfs = gfs;
-  char overwrite = 0; //XXX: should be a param?
+  char overwrite = 1; //XXX: should be a param?
   if (overwrite && (gridfs_find_filename(gfs, remote_name, &tmpFile) == MONGO_OK)) {
     if( gridfile_exists(&tmpFile) ) {
       /* If file exists, then let's initialize members dedicated to coordinate writing operations 
