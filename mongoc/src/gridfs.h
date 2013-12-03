@@ -201,7 +201,7 @@ MONGO_EXPORT int gridfs_find_query( gridfs *gfs, const bson *query, gridfile *gf
  *
  *  @return MONGO_OK or MONGO_ERROR.
  */
-MONGO_EXPORT int gridfs_find_filename( gridfs *gfs, const char *filename, gridfile *gfile );
+MONGO_EXPORT int gridfs_find_filename( gridfs *gfs, const char *filename, const char *contenttype, gridfile *gfile );
 
 /**
  *  Returns whether or not the GridFile exists

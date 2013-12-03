@@ -62,7 +62,7 @@ int64_t mongo_file_exists_(const char *file_name, time_t *ctime)
   int64_t len = -1;
   gridfile gfile[1];
 
-  if ((gridfs_find_filename( gfs, file_name, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+  if ((gridfs_find_filename( gfs, file_name, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
   {
     len = gridfile_get_contentlength(gfile);
     if (ctime != NULL)
@@ -144,7 +144,7 @@ int64_t mongo_read(const char *file_name, char *data, size_t size, off_t offset)
   int64_t len = 0;
   gridfile gfile[1];
 
-  if ((gridfs_find_filename( gfs, file_name, gfile ) == MONGO_OK) && (gridfile_exists( gfile ))) //sorts by uploadDate:-1
+  if ((gridfs_find_filename( gfs, file_name, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile ))) //sorts by uploadDate:-1
   {
     len = gridfile_get_contentlength(gfile);
 
@@ -178,8 +178,16 @@ int64_t mongo_write(const char *filename, const char *buf, size_t size, off_t of
         return -1;
     }
 
-    if (MONGO_OK == gridfs_store_buffer( gfs, buf, size, filename, "text/html", GRIDFILE_DEFAULT ))
+    if (MONGO_OK == gridfs_store_buffer( gfs, buf, size, filename, FILE_CT, GRIDFILE_DEFAULT ))
       return size;
+    else
+      return -1;
+}
+
+int mongo_mkdir(const char *dirname)
+{
+    if (MONGO_OK == gridfs_store_buffer( gfs, NULL, 0, dirname, DIR_CT, GRIDFILE_DEFAULT ))
+      return 0;
     else
       return -1;
 }

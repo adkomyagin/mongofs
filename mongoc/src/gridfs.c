@@ -422,12 +422,14 @@ MONGO_EXPORT int gridfs_find_query( gridfs *gfs, const bson *query, gridfile *gf
   }
 }
 
-MONGO_EXPORT int gridfs_find_filename(gridfs *gfs, const char *filename, gridfile *gfile){
+MONGO_EXPORT int gridfs_find_filename(gridfs *gfs, const char *filename, const char *contenttype, gridfile *gfile){
   bson query[1];
   int res;
 
   bson_init(query);
   bson_append_string_uppercase( query, "filename", filename, gfs->caseInsensitive );
+  if (contenttype != NULL)
+    bson_append_string_uppercase( query, "contentType", contenttype, gfs->caseInsensitive );
   bson_finish(query);
   res = gridfs_find_query(gfs, query, gfile);
   bson_destroy(query);
@@ -531,7 +533,7 @@ MONGO_EXPORT int gridfile_writer_init(gridfile *gfile, gridfs *gfs, const char *
 
   gfile->gfs = gfs;
   char overwrite = 1; //XXX: should be a param?
-  if (overwrite && (gridfs_find_filename(gfs, remote_name, &tmpFile) == MONGO_OK)) {
+  if (overwrite && (gridfs_find_filename(gfs, remote_name, content_type, &tmpFile) == MONGO_OK)) {
     if( gridfile_exists(&tmpFile) ) {
       /* If file exists, then let's initialize members dedicated to coordinate writing operations 
        with existing file metadata */

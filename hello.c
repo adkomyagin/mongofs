@@ -109,6 +109,14 @@ hello_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 }
 
 static int
+hello_mkdir(const char *path, mode_t mode)
+{
+    printf("mkdir requested: %s\n", path);
+
+    return mongo_mkdir(path);
+}
+
+static int
 hello_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     printf("write requested: %s, size: %d, offset: %d\n", path, size, offset);
@@ -152,7 +160,8 @@ static struct fuse_operations hello_filesystem_operations = {
     .write   = hello_write,
     .unlink  = hello_unlink,
     .release = hello_release,
-    .fsync   = hello_fsync
+    .fsync   = hello_fsync,
+    .mkdir   = hello_mkdir
 };
 
 int
