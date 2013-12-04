@@ -2,6 +2,7 @@
 #include "mongo.h"
 #include "gridfs.h"
 #include "imongo.h"
+#include <libgen.h>
 
 #define ASSERT(x) \
     do{ \
@@ -74,18 +75,61 @@ int64_t mongo_file_exists_(const char *file_name, time_t *ctime)
   return len;
 }
 
-int mongo_find_names_distinct( fuse_fill_dir_t filler, void *buf )
+int64_t mongo_dir_exists_(const char *dir_name, time_t *ctime)
+{
+  int64_t len = -1;
+  gridfile gfile[1];
+
+  if ((gridfs_find_filename( gfs, dir_name, DIR_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+  {
+    len = gridfile_get_contentlength(gfile);
+    if (ctime != NULL)
+      *ctime = (time_t)gridfile_get_uploaddate(gfile)/1000;
+  }
+  else
+    printf("dir not found: %s\n", dir_name);
+
+  return len;
+}
+
+int mongo_find_file_names_distinct( const char *path, fuse_fill_dir_t filler, void *buf )
 {
     bson b[1];
     bson out[1];
+    bson query[1];
+
+    static char file_regex[] = "[^/?*:;{}\]+$";
+    char regex[1 + strlen(path) + 1 + strlen(file_regex) + 1];
+    int regex_off = 0;
+
+    regex[regex_off++] = '^';
+    memcpy(&(regex[regex_off]) , path, strlen(path)); regex_off+=strlen(path);
+    if (strcmp(path, "/") != 0)
+    {
+      regex[regex_off++] = '/';
+    }
+    memcpy(&(regex[regex_off]) , file_regex, strlen(file_regex)); regex_off+=strlen(file_regex);
+    regex[regex_off++] = '\0';
 
     bson_init( b );
     bson_append_string( b, "distinct", "fs.files" );
     bson_append_string( b, "key", "filename" );
+    bson_init(query);
+      //bson_append_string(query, "contentType", FILE_CT);
+       bson_append_start_object( query, "filename" );
+       bson_append_string( query, "$regex", regex );
+       bson_append_finish_object( query );
+    bson_finish(query);
+    bson_append_bson(b, "query", query);
+    bson_destroy(query);
+
     bson_finish( b );
 
     if (mongo_run_command( g_conn, "ctest", b, out ) != MONGO_OK)
+    {
+      bson_destroy( b );
       return -1;
+    }
 
     bson_destroy( b );
 
@@ -93,10 +137,14 @@ int mongo_find_names_distinct( fuse_fill_dir_t filler, void *buf )
 
     if ( bson_find( iterator, out, "values" )) {
       bson_iterator_subiterator( iterator, sub );
-    }
 
-    while( bson_iterator_next(sub) )
-      filler(buf, bson_iterator_string( sub ), NULL, 0);
+      while( bson_iterator_next(sub) )
+      {
+        //printf("GOT ID: %s\n", bson_iterator_string( sub ));
+        filler(buf, basename(bson_iterator_string( sub )), NULL, 0);
+      }
+
+    }
 
     bson_destroy( out );
 

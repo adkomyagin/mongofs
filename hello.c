@@ -39,10 +39,14 @@ hello_getattr(const char *path, struct stat *stbuf)
     if (strcmp(path, "/") == 0) { /* The root directory of our file system. */
         stbuf->st_mode = S_IFDIR | 0777;
         stbuf->st_nlink = 3;
-    } else if ((len = mongo_file_exists_(basename(path), &ctime)) != -1) { /* The file that we have. */
+    } else if ((len = mongo_file_exists_(path, &ctime)) != -1) { /* The file that we have. */
         stbuf->st_mode = S_IFREG | 0777;
         stbuf->st_nlink = 1;
         stbuf->st_size = len;
+        stbuf->st_ctime = stbuf->st_mtime = ctime;
+    } else if ((len = mongo_dir_exists_(path, &ctime)) != -1) { /* The dir that we have. */
+        stbuf->st_mode = S_IFDIR | 0777;
+        stbuf->st_nlink = 3;
         stbuf->st_ctime = stbuf->st_mtime = ctime;
         //char buff[20];
         //strftime(buff, 20, "%Y-%m-%d %H:%M:%S", localtime(&ctime));
@@ -61,7 +65,7 @@ hello_getattr(const char *path, struct stat *stbuf)
 static int
 hello_open(const char *path, struct fuse_file_info *fi)
 {
-    if (mongo_file_exists(basename(path)) == -1) /* We only recognize files we have */
+    if (mongo_file_exists(path) == -1) /* We only recognize files we have */
         return -ENOENT;
 
     //if ((fi->flags & O_ACCMODE) != O_RDONLY) /* Only reading allowed. */
@@ -78,13 +82,10 @@ hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 {
     printf("readdir: %s\n", path);
 
-    if (strcmp(path, "/") != 0) /* We only recognize the root directory. */
-        return -ENOENT;
-
     filler(buf, ".", NULL, 0);           /* Current directory (.)  */
     filler(buf, "..", NULL, 0);          /* Parent directory (..)  */
 
-    mongo_find_names_distinct(filler, buf);
+    mongo_find_file_names_distinct(path, filler, buf);
 
     return 0;
 }
@@ -95,7 +96,7 @@ hello_read(const char *path, char *buf, size_t size, off_t offset,
 {
     printf("read requested: %s, size: %d, offset: %d\n", path, size, offset);
 
-    return mongo_read(basename(path), buf, size, offset);
+    return mongo_read(path, buf, size, offset);
 }
 
 static int
@@ -103,7 +104,7 @@ hello_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
     printf("file create: %s\n", path);
 
-    mongo_write(basename(path), NULL, 0, 0);
+    mongo_write(path, NULL, 0, 0);
 
     return 0;
 }
@@ -121,7 +122,7 @@ hello_write(const char *path, const char *buf, size_t size, off_t offset, struct
 {
     printf("write requested: %s, size: %d, offset: %d\n", path, size, offset);
 
-    return mongo_write(basename(path), buf, size, offset);
+    return mongo_write(path, buf, size, offset);
 }
 
 static int
@@ -129,7 +130,7 @@ hello_unlink(const char *path)
 {
     printf("file unlink: %s\n", path);
 
-    mongo_unlink(basename(path));
+    mongo_unlink(path);
 
     return 0;
 }
