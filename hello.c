@@ -118,6 +118,22 @@ hello_mkdir(const char *path, mode_t mode)
 }
 
 static int
+hello_rmdir(const char *path)
+{
+    printf("rmdir requested: %s\n", path);
+
+    //printf("DID EMPTY: %d\n", mongo_dir_empty( path ));
+
+    if (mongo_dir_empty( path ) == 1)
+    {
+        mongo_unlink(path);
+        return 0;
+    }
+    else
+        return -ENOTEMPTY;
+}
+
+static int
 hello_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     printf("write requested: %s, size: %d, offset: %d\n", path, size, offset);
@@ -162,7 +178,8 @@ static struct fuse_operations hello_filesystem_operations = {
     .unlink  = hello_unlink,
     .release = hello_release,
     .fsync   = hello_fsync,
-    .mkdir   = hello_mkdir
+    .mkdir   = hello_mkdir,
+    .rmdir   = hello_rmdir
 };
 
 int

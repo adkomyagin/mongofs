@@ -21,6 +21,7 @@ int mongo_unlink(const char *filename);
 int mongo_mkdir(const char *dirname);
 
 int64_t mongo_dir_exists_(const char *dir_name, time_t *ctime);
+int mongo_dir_empty( const char *path );
 
 #define FILE_CT "text/html"
 #define DIR_CT	"dir"

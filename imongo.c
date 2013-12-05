@@ -151,6 +151,33 @@ int mongo_find_file_names_distinct( const char *path, fuse_fill_dir_t filler, vo
     return 0;
 }
 
+int mongo_dir_empty( const char *path )
+{
+    static char file_regex[] = "[^/?*:;{}\]+$";
+    char regex[1 + strlen(path) + 1 + strlen(file_regex) + 1];
+    int regex_off = 0;
+
+    regex[regex_off++] = '^';
+    memcpy(&(regex[regex_off]) , path, strlen(path)); regex_off+=strlen(path);
+    if (strcmp(path, "/") != 0)
+    {
+      regex[regex_off++] = '/';
+    }
+    memcpy(&(regex[regex_off]) , file_regex, strlen(file_regex)); regex_off+=strlen(file_regex);
+    regex[regex_off++] = '\0';
+
+
+    bson query[1];
+
+    bson_init(query);
+    bson_append_start_object( query, "filename" );
+      bson_append_string( query, "$regex", regex );
+    bson_append_finish_object( query );
+    bson_finish(query);
+
+    return (mongo_find_one(gfs->client, gfs->files_ns, query, NULL, NULL) != MONGO_OK);
+}
+
 int mongo_find_names( fuse_fill_dir_t filler, void *buf )
 {
   bson names[1];
