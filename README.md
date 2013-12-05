@@ -1,7 +1,7 @@
 mongofs
 =======
 
-FUSE-based FS backed by MongoDB GridFS
+Experimental FUSE-based FS backed by MongoDB GridFS
 
 to build: sh build.sh
 
