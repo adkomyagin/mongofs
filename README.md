@@ -17,3 +17,6 @@ Notes:
 contentType
 
 4. versioning support is not available
+
+5. I'm using OS X FUSE that should be compatible with Linux, but
+I have not tested the app on any other OS yet.
