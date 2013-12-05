@@ -13,4 +13,5 @@ Notes:
 
 2. direct_io is needed so data is not cached in the kernel
 
-3. currently no versioning or subdirectories support is available
+3. subdirectories support is implemented through the special "dir"
+contentType
