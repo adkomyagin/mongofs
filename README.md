@@ -15,3 +15,5 @@ Notes:
 
 3. subdirectories support is implemented through the special "dir"
 contentType
+
+4. versioning support is not available
