@@ -120,7 +120,7 @@ MONGO_EXPORT void gridfile_destroy( gridfile *gfile );
  *
  */
 MONGO_EXPORT int gridfile_writer_init( gridfile *gfile, gridfs *gfs, const char *remote_name,
-                                       const char *content_type, int flags );
+                                       const char *content_type, int flags, int overwrite );
 
 /**
  *  Write to a GridFS file incrementally. You can call this function any number
@@ -155,7 +155,7 @@ MONGO_EXPORT int gridfile_writer_done( gridfile *gfile );
  */
 MONGO_EXPORT int gridfs_store_buffer( gridfs *gfs, const char *data, gridfs_offset length,
                           const char *remotename,
-                          const char *contenttype, int flags );
+                          const char *contenttype, int flags, int overwrite );
 
 /**
  *  Open the file referenced by filename and store it as a GridFS file.

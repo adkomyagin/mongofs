@@ -291,12 +291,12 @@ static int gridfs_insert_file(gridfs *gfs, const char *name, const bson_oid_t id
   return result;
 }
 
-MONGO_EXPORT int gridfs_store_buffer(gridfs *gfs, const char *data, gridfs_offset length, const char *remotename, const char *contenttype, int flags ) {
+MONGO_EXPORT int gridfs_store_buffer(gridfs *gfs, const char *data, gridfs_offset length, const char *remotename, const char *contenttype, int flags, int overwrite ) {
   gridfile gfile;
   gridfs_offset bytes_written;
   
   gridfile_init( gfs, NULL, &gfile );
-  gridfile_writer_init( &gfile, gfs, remotename, contenttype, flags );
+  gridfile_writer_init( &gfile, gfs, remotename, contenttype, flags, overwrite);
   
   bytes_written = gridfile_write_buffer( &gfile, data, length );
 
@@ -329,7 +329,7 @@ MONGO_EXPORT int gridfs_store_file(gridfs *gfs, const char *filename, const char
   }
 
   if( gridfile_init( gfs, NULL, &gfile ) != MONGO_OK ) return MONGO_ERROR;
-  if( gridfile_writer_init( &gfile, gfs, remotename, contenttype, flags ) != MONGO_OK ){
+  if( gridfile_writer_init( &gfile, gfs, remotename, contenttype, flags, 1 ) != MONGO_OK ){
     gridfile_destroy( &gfile );
     return MONGO_ERROR; 
   }
@@ -528,11 +528,10 @@ static void gridfile_init_flags(gridfile *gfile) {
     gfile->flags = 0;
 }
 
-MONGO_EXPORT int gridfile_writer_init(gridfile *gfile, gridfs *gfs, const char *remote_name, const char *content_type, int flags ) {
+MONGO_EXPORT int gridfile_writer_init(gridfile *gfile, gridfs *gfs, const char *remote_name, const char *content_type, int flags, int overwrite ) {
   gridfile tmpFile;
 
   gfile->gfs = gfs;
-  char overwrite = 1; //XXX: should be a param?
   if (overwrite && (gridfs_find_filename(gfs, remote_name, content_type, &tmpFile) == MONGO_OK)) {
     if( gridfile_exists(&tmpFile) ) {
       /* If file exists, then let's initialize members dedicated to coordinate writing operations 

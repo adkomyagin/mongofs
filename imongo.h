@@ -27,3 +27,8 @@ int mongo_dir_empty( const char *path );
 
 #define FILE_CT "text/html"
 #define DIR_CT	"dir"
+
+typedef struct {
+	gridfile gfile;
+	char is_creator;
+} mongo_fs_handle;

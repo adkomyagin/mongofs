@@ -265,7 +265,7 @@ int64_t mongo_write(const char *filename, const char *buf, size_t size, off_t of
         return -1;
     }
 
-    if (MONGO_OK == gridfs_store_buffer( gfs, buf, size, filename, FILE_CT, GRIDFILE_DEFAULT ))
+    if (MONGO_OK == gridfs_store_buffer( gfs, buf, size, filename, FILE_CT, GRIDFILE_DEFAULT, 0/*don't overwrite*/ ))
       return size;
     else
       return -1;
@@ -273,7 +273,7 @@ int64_t mongo_write(const char *filename, const char *buf, size_t size, off_t of
 
 int mongo_mkdir(const char *dirname)
 {
-    if (MONGO_OK == gridfs_store_buffer( gfs, NULL, 0, dirname, DIR_CT, GRIDFILE_DEFAULT ))
+    if (MONGO_OK == gridfs_store_buffer( gfs, NULL, 0, dirname, DIR_CT, GRIDFILE_DEFAULT, 1/*do overwrite*/ ))
       return 0;
     else
       return -1;
