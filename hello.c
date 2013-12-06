@@ -65,13 +65,12 @@ hello_getattr(const char *path, struct stat *stbuf)
 static int
 hello_open(const char *path, struct fuse_file_info *fi)
 {
-    if (mongo_file_exists(path) == -1) /* We only recognize files we have */
+    void *fh = mongo_get_file_handle(path);
+    if (fh == NULL) /* We only recognize files we have */
         return -ENOENT;
 
-    //if ((fi->flags & O_ACCMODE) != O_RDONLY) /* Only reading allowed. */
-    //    return -EACCES;
-
-    printf("file open: %s\n", path);
+    fi->fh = (int64_t)fh;
+    printf("file open: %s. handle: 0x%X\n", path, fi->fh);
 
     return 0;
 }
@@ -136,7 +135,7 @@ hello_rmdir(const char *path)
 static int
 hello_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-    printf("write requested: %s, size: %d, offset: %d\n", path, size, offset);
+    printf("write requested: %s, size: %d, offset: %d. handle: 0x%X\n", path, size, offset, fi->fh);
 
     return mongo_write(path, buf, size, offset);
 }
@@ -155,6 +154,7 @@ static int
 hello_release(const char *path, struct fuse_file_info *fi)
 {
     printf("file release: %s\n", path);
+    mongo_destroy_file_handle((void*)fi->fh);
 
     return 0;
 }

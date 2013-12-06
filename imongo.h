@@ -11,7 +11,9 @@ int64_t mongoread(const char *file_name, char *data);
 int mongo_destroy_gfs();
 int mongo_init_gfs(const char *server, int port);
 
-int64_t mongo_file_exists(const char *file_name);
+void* mongo_get_file_handle(const char *file_name);
+void mongo_destroy_file_handle(void *fh);
+
 int64_t mongo_file_exists_(const char *file_name, time_t *ctime);
 int mongo_find_names( fuse_fill_dir_t filler, void *buf );
 int64_t mongo_read(const char *file_name, char *data, size_t size, off_t offset);

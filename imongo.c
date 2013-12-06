@@ -42,22 +42,6 @@ int mongo_destroy_gfs()
   return 0;
 }
 
-int64_t mongo_file_exists(const char *file_name)
-{
-  /*int64_t len = -1;
-  gridfile gfile[1];
-
-  if ((gridfs_find_filename( gfs, file_name, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
-  {
-    len = gridfile_get_contentlength(gfile);
-  }
-  else
-    printf("file not found: %s\n", file_name);
-
-  return len;*/
-  return mongo_file_exists_(file_name, NULL);
-}
-
 int64_t mongo_file_exists_(const char *file_name, time_t *ctime)
 {
   int64_t len = -1;
@@ -68,11 +52,37 @@ int64_t mongo_file_exists_(const char *file_name, time_t *ctime)
     len = gridfile_get_contentlength(gfile);
     if (ctime != NULL)
       *ctime = (time_t)gridfile_get_uploaddate(gfile)/1000;
+
+    gridfile_destroy( gfile );
   }
   else
     printf("file not found: %s\n", file_name);
 
   return len;
+}
+
+void* mongo_get_file_handle(const char *file_name)
+{
+  gridfile *gfile = (gridfile *)malloc(sizeof(gridfile));
+
+  if ((gridfs_find_filename( gfs, file_name, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+  {
+    //it's ok
+  }
+  else
+  {
+    printf("file not found: %s\n", file_name);
+    free(gfile);
+    gfile = NULL;
+  }
+
+  return gfile;
+}
+
+void mongo_destroy_file_handle(void *fh)
+{
+  gridfile_destroy((gridfile *)fh);
+  free(fh);
 }
 
 int64_t mongo_dir_exists_(const char *dir_name, time_t *ctime)
@@ -85,6 +95,8 @@ int64_t mongo_dir_exists_(const char *dir_name, time_t *ctime)
     len = gridfile_get_contentlength(gfile);
     if (ctime != NULL)
       *ctime = (time_t)gridfile_get_uploaddate(gfile)/1000;
+
+    gridfile_destroy( gfile );
   }
   else
     printf("dir not found: %s\n", dir_name);
