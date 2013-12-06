@@ -65,7 +65,7 @@ hello_getattr(const char *path, struct stat *stbuf)
 static int
 hello_open(const char *path, struct fuse_file_info *fi)
 {
-    void *fh = mongo_get_file_handle(path);
+    mongo_fs_handle *fh = mongo_get_file_handle(path);
     if (fh == NULL) /* We only recognize files we have */
         return -ENOENT;
 

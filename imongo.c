@@ -61,27 +61,33 @@ int64_t mongo_file_exists_(const char *file_name, time_t *ctime)
   return len;
 }
 
-void* mongo_get_file_handle(const char *file_name)
+mongo_fs_handle* mongo_get_file_handle(const char *file_name)
 {
-  gridfile *gfile = (gridfile *)malloc(sizeof(gridfile));
+  mongo_fs_handle *handle = (mongo_fs_handle *)calloc(1, sizeof(mongo_fs_handle));
 
-  if ((gridfs_find_filename( gfs, file_name, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+  if ((gridfs_find_filename( gfs, file_name, FILE_CT, handle->gfile ) == MONGO_OK) && (gridfile_exists( handle->gfile )))
   {
     //it's ok
   }
   else
   {
     printf("file not found: %s\n", file_name);
-    free(gfile);
-    gfile = NULL;
+    free(handle);
+    handle = NULL;
   }
 
-  return gfile;
+  return handle;
 }
 
-void mongo_destroy_file_handle(void *fh)
+void mongo_destroy_file_handle(mongo_fs_handle *fh)
 {
-  gridfile_destroy((gridfile *)fh);
+  if (fh == NULL)
+  {
+    printf("File handle is NULL in mongo_destroy_file_handle!\n");
+    return;
+  }
+
+  gridfile_destroy(fh->gfile);
   free(fh);
 }
 
