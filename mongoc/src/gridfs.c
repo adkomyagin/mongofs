@@ -783,6 +783,76 @@ static int gridfile_load_pending_data_with_pos_chunk(gridfile *gfile) {
   return MONGO_OK;
 }
 
+static int mongoc_find_id(gridfs *gfs, bson_oid_t *id, gridfile *gfile) {
+  bson query[1];
+  int res;
+
+  bson_init(query);
+  bson_append_oid( query, "_id", id );
+  bson_finish(query);
+  res = gridfs_find_query(gfs, query, gfile);
+  bson_destroy(query);
+  return res;
+}
+
+/*
+ * Makes sure gfile represents the new/existing file on exit 
+ */
+MONGO_EXPORT int gridfs_store_buffer_advanced(gridfs *gfs, const char *data, gridfs_offset length, gridfile *gfile, const char *remote_name, const char *content_type, int flags ) {
+  gridfs_offset bytes_written;
+  char reload_meta = 0;
+  
+  if (! gridfile_exists(gfile) ) {
+    printf("mongoc_store_buffer: file does not exist, filling up\n");
+
+    gridfile_init( gfs, NULL, gfile );
+    /* File doesn't exist, let's create a new bson id and initialize length to zero */
+    bson_oid_gen(&(gfile->id));
+    gfile->length = 0;
+    /* File doesn't exist, lets use the flags passed as a parameter to this procedure call */
+    gfile->flags = flags;
+
+    reload_meta = 1;
+  } else {
+      gfile->id = gridfile_get_id( gfile );
+      gridfile_init_length( gfile );            
+      gfile->chunkSize = gridfile_get_chunksize( gfile );
+      if( flags != GRIDFILE_DEFAULT) {
+        gfile->flags = flags;
+      } else {
+        gridfile_init_flags( gfile );
+      }
+  }
+
+  /* We initialize chunk_num with zero, but it will get always calculated when calling 
+     gridfile_load_pending_data_with_pos_chunk() or when calling gridfile_write_buffer() */
+  gfile->chunk_num = 0; 
+  gfile->pos = 0;
+
+  gfile->remote_name = (char*)bson_malloc((int)strlen(remote_name) + 1);
+  strcpy((char*)gfile->remote_name, remote_name);
+
+  gfile->content_type = (char*)bson_malloc((int)strlen(content_type) + 1);
+  strcpy((char*)gfile->content_type, content_type);  
+
+  gfile->pending_len = 0;
+  /* Let's pre-allocate DEFAULT_CHUNK_SIZE bytes into pending_data then we don't need to worry 
+     about doing realloc everywhere we want use the pending_data buffer */
+  gfile->pending_data = (char*) bson_malloc(DEFAULT_CHUNK_SIZE);
+  
+  bytes_written = gridfile_write_buffer( gfile, data, length );
+
+  gridfile_writer_done( gfile );
+
+  //find the file by _id if it still does not exist
+  if ( reload_meta ) {
+    printf("mongoc_store_buffer: going to find file by ID\n");
+    mongoc_find_id(gfs, &(gfile->id), gfile);
+  }
+
+  return bytes_written == length ? MONGO_OK : MONGO_ERROR;
+}
+
 MONGO_EXPORT gridfs_offset gridfile_write_buffer(gridfile *gfile, const char *data, gridfs_offset length) {
 
   bson *oChunk;

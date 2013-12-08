@@ -103,7 +103,12 @@ hello_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
     printf("file create: %s\n", path);
 
-    mongo_write(path, NULL, 0, 0);
+    mongo_fs_handle *fh = mongo_create_file_handle();
+    fh->is_creator = 1;
+
+    mongo_write(fh, path, NULL, 0, 0);
+
+    fi->fh = (int64_t)fh;
 
     return 0;
 }
@@ -137,7 +142,16 @@ hello_write(const char *path, const char *buf, size_t size, off_t offset, struct
 {
     printf("write requested: %s, size: %d, offset: %d. handle: 0x%X\n", path, size, offset, fi->fh);
 
-    return mongo_write(path, buf, size, offset);
+    mongo_fs_handle *fh = (mongo_fs_handle *)fi->fh;
+
+    if (fh->is_creator == 0)
+    {
+        mongo_reset_file_handle(fh);
+        fh->is_creator = 1;
+        printf("write had set creator mode\n");
+    }
+
+    return mongo_write(fh, path, buf, size, offset);
 }
 
 static int

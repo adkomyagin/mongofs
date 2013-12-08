@@ -91,6 +91,20 @@ void mongo_destroy_file_handle(mongo_fs_handle *fh)
   free(fh);
 }
 
+mongo_fs_handle* mongo_create_file_handle()
+{
+  mongo_fs_handle *handle = (mongo_fs_handle *)calloc(1, sizeof(mongo_fs_handle));
+  //gridfile_init( gfs, NULL, handle->gfile );
+
+  return handle;
+}
+
+void mongo_reset_file_handle(mongo_fs_handle *fh)
+{
+  gridfile_destroy(fh->gfile);
+  //gridfile_init( gfs, NULL, fh->gfile );
+}
+
 int64_t mongo_dir_exists_(const char *dir_name, time_t *ctime)
 {
   int64_t len = -1;
@@ -263,7 +277,7 @@ int mongo_unlink(const char *filename)
     return gridfs_remove_filename(gfs, filename);
 }
 
-int64_t mongo_write(const char *filename, const char *buf, size_t size, off_t offset)
+int64_t mongo_write(mongo_fs_handle *fh, const char *filename, const char *buf, size_t size, off_t offset)
 {
     if (offset != 0) //don't support partial writes yet
     {
@@ -271,7 +285,7 @@ int64_t mongo_write(const char *filename, const char *buf, size_t size, off_t of
         return -1;
     }
 
-    if (MONGO_OK == gridfs_store_buffer( gfs, buf, size, filename, FILE_CT, GRIDFILE_DEFAULT, 0/*don't overwrite*/ ))
+    if (MONGO_OK == gridfs_store_buffer_advanced( gfs, buf, size, fh->gfile, filename, FILE_CT, GRIDFILE_DEFAULT))
       return size;
     else
       return -1;
@@ -279,7 +293,7 @@ int64_t mongo_write(const char *filename, const char *buf, size_t size, off_t of
 
 int mongo_mkdir(const char *dirname)
 {
-    if (MONGO_OK == gridfs_store_buffer( gfs, NULL, 0, dirname, DIR_CT, GRIDFILE_DEFAULT, 1/*do overwrite*/ ))
+    if (MONGO_OK == gridfs_store_buffer( gfs, NULL, 0, dirname, DIR_CT, GRIDFILE_DEFAULT, 1/*safe to always overwrite*/ ))
       return 0;
     else
       return -1;

@@ -426,4 +426,7 @@ MONGO_EXPORT gridfs_offset gridfile_expand(gridfile *gfile, gridfs_offset bytesT
  */
 MONGO_EXPORT gridfs_offset gridfile_set_size(gridfile *gfile, gridfs_offset newSize);
 
+MONGO_EXPORT int gridfs_store_buffer_advanced(gridfs *gfs, const char *data, gridfs_offset length, gridfile *gfile, const char *remote_name, const char *content_type, int flags );
+
+
 #endif
