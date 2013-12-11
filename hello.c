@@ -24,6 +24,9 @@ static struct fuse_opt hello_opts[] =
     FUSE_OPT_END
 };
 
+/*
+ * All access operations are trying to access the latest copy of the file (sort by lastModified and _id)
+ */
 
 static int
 hello_getattr(const char *path, struct stat *stbuf)
@@ -93,9 +96,11 @@ static int
 hello_read(const char *path, char *buf, size_t size, off_t offset,
            struct fuse_file_info *fi)
 {
-    printf("read requested: %s, size: %d, offset: %d\n", path, size, offset);
+    printf("read requested: %s, size: %d, offset: %d. handle: 0x%X\n", path, size, offset, fi->fh);
 
-    return mongo_read(path, buf, size, offset);
+    mongo_fs_handle *fh = (mongo_fs_handle *)fi->fh;
+
+    return mongo_read(fh, buf, size, offset);
 }
 
 static int

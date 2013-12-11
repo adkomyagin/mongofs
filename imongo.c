@@ -247,27 +247,23 @@ int mongo_find_names( fuse_fill_dir_t filler, void *buf )
 }
 
 
-int64_t mongo_read(const char *file_name, char *data, size_t size, off_t offset) {
+int64_t mongo_read(const mongo_fs_handle *fh, char *data, size_t size, off_t offset) {
   int64_t len = 0;
-  gridfile gfile[1];
+  gridfile *gfile = fh->gfile;
 
-  if ((gridfs_find_filename( gfs, file_name, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile ))) //sorts by uploadDate:-1
-  {
-    len = gridfile_get_contentlength(gfile);
+  len = gridfile_get_contentlength(gfile);
 
-    if (offset >= len) /* Trying to read past the end of file. */
-        return 0;
+  if (offset >= len) /* Trying to read past the end of file. */
+      return 0;
 
-    if (offset + size > len) /* Trim the read to the file size. */
-        size = len - offset;
+  if (offset + size > len) /* Trim the read to the file size. */
+      size = len - offset;
 
-    gridfile_seek(gfile, offset);
-    ASSERT( gridfile_read_buffer( gfile, data, size ) ==  (size_t)(size));
+  gridfile_seek(gfile, offset);
+  ASSERT( gridfile_read_buffer( gfile, data, size ) ==  (size_t)(size));
     //ridfs_offset bytes_read = gridfile_read_buffer(gfile,data,len);
     //ASSERT(bytes_read == len);
-  }
-  else
-    printf("file not found\n");
+  gridfile_seek(gfile, 0); //restore the initial position
 
   return len;
 }
