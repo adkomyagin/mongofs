@@ -403,6 +403,7 @@ MONGO_EXPORT int gridfs_find_query( gridfs *gfs, const bson *query, gridfile *gf
 
   bson_init(uploadDate);
   bson_append_int(uploadDate, "uploadDate",  - 1);
+  bson_append_int(uploadDate, "_id",  - 1); //we need to reflect that there could be multiple files created within the uploadDate resolution
   bson_finish(uploadDate);
 
   bson_init(finalQuery);
