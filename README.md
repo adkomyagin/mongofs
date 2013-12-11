@@ -16,7 +16,10 @@ Notes:
 3. subdirectories support is implemented through the special "dir"
 contentType
 
-4. versioning support is not available
+4. versioning support is very experimental
+  - each process that writes to the file creates a new version of the file
+  - on open/getattr we are always accessing the latest version
+  - there is no way to view all versions
 
 5. I'm using OS X FUSE that should be compatible with Linux, but
 I have not tested the app on any other OS yet.
