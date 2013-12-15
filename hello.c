@@ -111,7 +111,7 @@ hello_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     mongo_fs_handle *fh = mongo_create_file_handle();
     fh->is_creator = 1;
 
-    mongo_write(fh, path, NULL, 0, 0);
+    mongo_create_file(fh, path);
 
     fi->fh = (int64_t)fh;
 
@@ -145,18 +145,20 @@ hello_rmdir(const char *path)
 static int
 hello_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
+    int cow = 0;
+
     printf("write requested: %s, size: %d, offset: %d. handle: 0x%X\n", path, size, offset, fi->fh);
 
     mongo_fs_handle *fh = (mongo_fs_handle *)fi->fh;
 
     if (fh->is_creator == 0)
     {
-        mongo_reset_file_handle(fh);
         fh->is_creator = 1;
+        cow = 1;
         printf("write had set creator mode\n");
     }
 
-    return mongo_write(fh, path, buf, size, offset);
+    return mongo_write(fh, path, buf, size, offset, cow/*copy_on_write*/);
 }
 
 static int

@@ -796,6 +796,48 @@ static int mongoc_find_id(gridfs *gfs, bson_oid_t *id, gridfile *gfile) {
   return res;
 }
 
+MONGO_EXPORT int gridfile_duplicate(gridfs *gfs, gridfile *gfile_source, gridfile *gfile_new)
+{
+  gridfile_init( gfs, NULL, gfile_new );
+  bson_oid_gen(&(gfile_new->id));
+
+  int chunks = gridfile_get_chunksize( gfile_source );
+  bson chk[1];
+  int i;
+  bson_iterator it[1];
+
+  //copy all the chunks
+  for (i=0;i<chunks;i++)
+  {
+    gridfile_get_chunk(gfile_source, i, chk);
+ 
+    if( bson_find(it, chk, "files_id") != BSON_EOO)
+      *bson_iterator_oid(it) = gfile_new->id;
+
+    if( bson_find(it, chk, "_id") != BSON_EOO)
+      bson_oid_gen(bson_iterator_oid(it));
+
+    mongo_insert( gfs->client, gfs->chunks_ns, chk, 0 );
+
+    bson_destroy( chk );
+  }
+
+  //copy the metadata
+  bson_copy(chk, gfile_source->meta);
+
+  if( bson_find(it, chk, "_id") != BSON_EOO)
+      *bson_iterator_oid(it) = gfile_new->id;
+
+  mongo_insert( gfs->client, gfs->files_ns, chk, 0 );
+
+  bson_destroy( chk );
+
+  //we call this mainly to ensure that gfile_new points to a real object
+  mongoc_find_id(gfs, &(gfile_new->id), gfile_new);
+
+  return 0;
+}
+
 /*
  * Makes sure gfile represents the new/existing file on exit 
  */
@@ -852,6 +894,45 @@ MONGO_EXPORT int gridfs_store_buffer_advanced(gridfs *gfs, const char *data, gri
   }
 
   return bytes_written == length ? MONGO_OK : MONGO_ERROR;
+}
+
+MONGO_EXPORT gridfs_offset gridfile_write_buffer_warp(gridfile *gfile, const char *data, gridfs_offset length) {
+  int res;
+
+  //we are intializing a set of meaningless fields here, dunno if I really need them
+  gfile->id = gridfile_get_id( gfile );         
+  gridfile_init_length( gfile );
+  gfile->chunkSize = gridfile_get_chunksize( gfile );
+  gfile->flags = gridfile_get_flags(gfile);
+
+  gfile->pending_len = 0;
+  /* Let's pre-allocate DEFAULT_CHUNK_SIZE bytes into pending_data then we don't need to worry 
+     about doing realloc everywhere we want use the pending_data buffer */
+  gfile->pending_data = (char*) bson_malloc((int)gridfs_pending_data_size(gfile->flags));
+
+  res = gridfile_write_buffer(gfile, data, length);
+
+  if (gfile->pending_len) {
+    /* write any remaining pending chunk data.
+     * pending data will always take up less than one chunk */
+    if (gridfile_flush_pendingchunk(gfile) != MONGO_OK)
+    {
+      printf("gridfile_flush_pendingchunk failed, don't know what to do!\n");
+    }    
+  }
+  if( gfile->pending_data ) {
+    bson_free(gfile->pending_data);    
+    gfile->pending_data = NULL;
+    gfile->pending_len = 0;   
+  }
+
+  gridfs_insert_file(gfile->gfs, gridfile_get_filename(gfile), gfile->id, gfile->length, gridfile_get_contenttype(gfile), gfile->flags, gfile->chunkSize);
+
+  //refetch the file since we just updated it
+  gridfile_destroy(gfile);
+  mongoc_find_id(gfile->gfs, &(gfile->id), gfile);
+
+  return res;
 }
 
 MONGO_EXPORT gridfs_offset gridfile_write_buffer(gridfile *gfile, const char *data, gridfs_offset length) {

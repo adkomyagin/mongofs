@@ -273,23 +273,45 @@ int mongo_unlink(const char *filename)
     return gridfs_remove_filename(gfs, filename);
 }
 
-int64_t mongo_write(mongo_fs_handle *fh, const char *filename, const char *buf, size_t size, off_t offset)
+/*
+ * If copy_on_write is provided, we will create a copy and reinitialize fh->gridfile 
+ */
+int64_t mongo_write(mongo_fs_handle *fh, const char *filename, const char *buf, size_t size, off_t offset, int copy_on_write)
 {
-    if (offset != 0) //don't support partial writes yet
-    {
-        printf("EASY BRO!\n");
+    int res;
+
+    if (copy_on_write) {
+      printf("duplicating file\n");
+      gridfile gfile_new[1];
+
+      if (gridfile_duplicate(gfs, fh->gfile, gfile_new) != 0)
+      {
+        printf("gridfile_duplicate failed!\n");
         return -1;
+      }
+
+      gridfile_destroy(fh->gfile);
+      *(fh->gfile) = *gfile_new;
     }
 
-    if (MONGO_OK == gridfs_store_buffer_advanced( gfs, buf, size, fh->gfile, filename, FILE_CT, GRIDFILE_DEFAULT))
-      return size;
-    else
-      return -1;
+    gridfile_seek(fh->gfile, offset);
+    res = gridfile_write_buffer_warp(fh->gfile, buf, size);
+    gridfile_seek(fh->gfile, 0);
+
+    return res;
 }
 
 int mongo_mkdir(const char *dirname)
 {
     if (MONGO_OK == gridfs_store_buffer( gfs, NULL, 0, dirname, DIR_CT, GRIDFILE_DEFAULT, 1/*safe to always overwrite*/ ))
+      return 0;
+    else
+      return -1;
+}
+
+int mongo_create_file(mongo_fs_handle *fh, const char *filename)
+{
+    if (MONGO_OK == gridfs_store_buffer_advanced( gfs, NULL, 0, fh->gfile, filename, FILE_CT, GRIDFILE_DEFAULT))
       return 0;
     else
       return -1;

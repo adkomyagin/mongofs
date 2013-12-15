@@ -24,7 +24,7 @@ mongo_fs_handle* mongo_create_file_handle();
 void mongo_reset_file_handle(mongo_fs_handle *fh);
 void mongo_destroy_file_handle(mongo_fs_handle *fh);
 
-int64_t mongo_write(mongo_fs_handle *fh, const char *filename, const char *buf, size_t size, off_t offset);
+int64_t mongo_write(mongo_fs_handle *fh, const char *filename, const char *buf, size_t size, off_t offset, int copy_on_write);
 int64_t mongo_read(const mongo_fs_handle *fh, char *data, size_t size, off_t offset);
 
 int64_t mongo_file_exists_(const char *file_name, time_t *ctime);
@@ -36,5 +36,7 @@ int mongo_mkdir(const char *dirname);
 
 int64_t mongo_dir_exists_(const char *dir_name, time_t *ctime);
 int mongo_dir_empty( const char *path );
+
+int mongo_create_file(mongo_fs_handle *fh, const char *filename);
 
 
