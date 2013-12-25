@@ -281,6 +281,8 @@ int64_t mongo_write(mongo_fs_handle *fh, const char *filename, const char *buf, 
     int res;
 
     if (copy_on_write) {
+      //TODO: we should be taking some lock on the original file here so it doesn't get modified by the owner in the process of duplicating
+
       printf("duplicating file\n");
       gridfile gfile_new[1];
 
@@ -289,6 +291,8 @@ int64_t mongo_write(mongo_fs_handle *fh, const char *filename, const char *buf, 
         printf("gridfile_duplicate failed!\n");
         return -1;
       }
+
+      printf("done\n");
 
       gridfile_destroy(fh->gfile);
       *(fh->gfile) = *gfile_new;

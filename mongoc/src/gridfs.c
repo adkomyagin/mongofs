@@ -116,6 +116,17 @@ static bson *chunk_new(bson_oid_t id, int chunkNumber, char** dataBuf, const cha
   return b;
 }
 
+static bson *chunk_new_normal(bson_oid_t id, int chunkNumber, const char* srcData, size_t len ) {
+  bson *b = bson_alloc();
+
+  bson_init_size(b, (int) len + 128); /* a little space for field names, files_id, and n */
+  bson_append_oid(b, "files_id", &id);
+  bson_append_int(b, "n", chunkNumber);
+  bson_append_binary(b, "data", BSON_BIN_BINARY, srcData, len);
+  bson_finish(b);
+  return b;
+}
+
 static void chunk_free(bson *oChunk) {
   if( oChunk ) {
     bson_destroy(oChunk);
@@ -801,36 +812,51 @@ MONGO_EXPORT int gridfile_duplicate(gridfs *gfs, gridfile *gfile_source, gridfil
   gridfile_init( gfs, NULL, gfile_new );
   bson_oid_gen(&(gfile_new->id));
 
-  int chunks = gridfile_get_chunksize( gfile_source );
+  int chunks = gridfile_get_numchunks( gfile_source );
   bson chk[1];
   int i;
   bson_iterator it[1];
+  bson *oChunk;
+  bson q[1];
+  const char *chunk_data;
+  long chunk_len;
+  int ret;
 
-  //copy all the chunks
-  for (i=0;i<chunks;i++)
+
+  for(i=0;i<chunks;i++)
   {
     gridfile_get_chunk(gfile_source, i, chk);
- 
-    if( bson_find(it, chk, "files_id") != BSON_EOO)
-      *bson_iterator_oid(it) = gfile_new->id;
+    if( bson_find(it, chk, "data") != BSON_EOO ) {
+      chunk_len = bson_iterator_bin_len(it);
+      chunk_data = bson_iterator_bin_data(it); 
 
-    if( bson_find(it, chk, "_id") != BSON_EOO)
-      bson_oid_gen(bson_iterator_oid(it));
+      if( (oChunk = chunk_new_normal( gfile_new->id, i, chunk_data, chunk_len)) == NULL) 
+        return -1;
 
-    mongo_insert( gfs->client, gfs->chunks_ns, chk, 0 );
+      gridfile_prepare_chunk_key_bson(q, &gfile_new->id, i);
+      ret = (mongo_update(gfs->client, gfs->chunks_ns, q, oChunk, MONGO_UPDATE_UPSERT, NULL) == MONGO_OK);
+      bson_destroy(q );
 
-    bson_destroy( chk );
+      chunk_free(oChunk);
+      bson_destroy( chk );
+
+      if (!ret)
+      {
+        bson_fatal_msg( 0, "failed duplicating the chunk" );
+        return -1;
+      }
+    } else {
+      bson_destroy( chk );
+      bson_fatal_msg( 0, "Chunk object doesn't have 'data' attribute" );
+      return -1;
+    }
   }
-
-  //copy the metadata
-  bson_copy(chk, gfile_source->meta);
-
-  if( bson_find(it, chk, "_id") != BSON_EOO)
-      *bson_iterator_oid(it) = gfile_new->id;
-
-  mongo_insert( gfs->client, gfs->files_ns, chk, 0 );
-
-  bson_destroy( chk );
+  
+  ret = (gridfs_insert_file(gfs, gridfile_get_filename(gfile_source), gfile_new->id, gridfile_get_contentlength(gfile_source), gridfile_get_contenttype(gfile_source), gridfile_get_flags(gfile_source), gridfile_get_chunksize(gfile_source)) == MONGO_OK);
+  if (!ret)
+  {
+    return -1;
+  }
 
   //we call this mainly to ensure that gfile_new points to a real object
   mongoc_find_id(gfs, &(gfile_new->id), gfile_new);
