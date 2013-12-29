@@ -2,7 +2,6 @@
 #include "mongo.h"
 #include "gridfs.h"
 #include "imongo.h"
-#include <libgen.h>
 
 #define ASSERT(x) \
     do{ \
@@ -57,6 +56,28 @@ int64_t mongo_file_exists_(const char *file_name, time_t *ctime)
   }
   else
     printf("file not found: %s\n", file_name);
+
+  return len;
+}
+
+int64_t mongo_file_id_exists_(const char *file_id, time_t *ctime)
+{
+  int64_t len = -1;
+  gridfile gfile[1];
+  bson_oid_t oid[1];
+
+  bson_oid_from_string(oid, file_id);
+
+  if ((gridfs_find_filename_by_id( gfs, oid, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+  {
+    len = gridfile_get_contentlength(gfile);
+    if (ctime != NULL)
+      *ctime = (time_t)gridfile_get_uploaddate(gfile)/1000;
+
+    gridfile_destroy( gfile );
+  }
+  else
+    printf("file id not found: %s\n", file_id);
 
   return len;
 }
@@ -179,6 +200,60 @@ int mongo_find_file_names_distinct( const char *path, fuse_fill_dir_t filler, vo
     }
 
     bson_destroy( out );
+
+    return 0;
+}
+
+int mongo_find_file_names_versions( const char *path, fuse_fill_dir_t filler, void *buf )
+{
+    static char file_regex[] = "[^/?*:;{}\]+$";
+    char regex[1 + strlen(path) + 1 + strlen(file_regex) + 1];
+    int regex_off = 0;
+
+    regex[regex_off++] = '^';
+    memcpy(&(regex[regex_off]) , path, strlen(path)); regex_off+=strlen(path);
+    if (strcmp(path, "/") != 0)
+    {
+      regex[regex_off++] = '/';
+    }
+    memcpy(&(regex[regex_off]) , file_regex, strlen(file_regex)); regex_off+=strlen(file_regex);
+    regex[regex_off++] = '\0';
+
+    bson query[1];
+    mongo_cursor cursor[1];
+
+    bson_init(query);
+       bson_append_string(query, "contentType", FILE_CT);
+       bson_append_start_object( query, "filename" );
+       bson_append_string( query, "$regex", regex );
+       bson_append_finish_object( query );
+    bson_finish(query);
+
+    mongo_cursor_init( cursor, gfs->client, gfs->files_ns );
+    mongo_cursor_set_query( cursor, query );
+
+    char version_name[MAX_FILENAME_LENGTH + 1 + 24 + 1]; //"name_id" form
+
+    while( mongo_cursor_next( cursor ) == MONGO_OK ) {
+      bson_iterator it_name[1], it_id[1];
+      if ( bson_find( it_name, mongo_cursor_bson( cursor ), "filename" ) &&
+           bson_find( it_id, mongo_cursor_bson( cursor ), "_id" )) {
+
+        char *vp = version_name;
+
+        char *name = basename( bson_iterator_string( it_name ) );
+        memcpy(vp, name, strlen(name)); vp += strlen(name);
+
+        *vp = '_'; vp++;
+        bson_oid_t *id = bson_iterator_oid( it_id );
+        bson_oid_to_string( id, vp ); //it will add trailing '\0' 
+
+        filler(buf, version_name, NULL, 0);  
+      }
+    }
+
+    bson_destroy( query );
+    mongo_cursor_destroy( cursor );
 
     return 0;
 }

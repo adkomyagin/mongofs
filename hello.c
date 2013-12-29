@@ -24,6 +24,57 @@ static struct fuse_opt hello_opts[] =
     FUSE_OPT_END
 };
 
+#define VERSION_DIR "versions"
+
+static int is_version_dir(const char *path)
+{
+    return strcmp(basename(path), VERSION_DIR) == 0;
+}
+
+static int is_versioned_file(const char *path) //we check if it's something like /../../{VERSION_DIR}/file
+{
+    int off = strlen(path) - 1;
+
+    //locate first "/"
+    while ((off >= 0) && (path[off] != '/'))
+        off--;
+
+    if (off == 0)
+        return 0;
+
+    //locate second "/"
+    off--;
+    while ((off >= 0) && (path[off] != '/'))
+        off--;
+
+    if (path[off] != '/') //sanity check
+        return 0;
+
+    return (0 == strncmp(&(path[off+1]),VERSION_DIR,strlen(VERSION_DIR)));
+}
+
+static int extract_file_version(const char *path, char *id) //we extract the id part from {name}_{id}
+{
+    char *name = basename(path);
+
+    int off = strlen(name) - 1;
+
+    //locate the "_"
+    while ((off >= 0) && (path[off] != '_'))
+        off--;
+
+    if (off == 0)
+        return 0;
+
+    if (strlen(&(name[off + 1])) != 24)
+        return 0;
+
+    memcpy(id,&(name[off + 1]), 24);
+    id[24] = '\0';
+
+    return 1;
+}
+
 /*
  * All access operations are trying to access the latest copy of the file (sort by lastModified and _id)
  */
@@ -42,6 +93,22 @@ hello_getattr(const char *path, struct stat *stbuf)
     if (strcmp(path, "/") == 0) { /* The root directory of our file system. */
         stbuf->st_mode = S_IFDIR | 0777;
         stbuf->st_nlink = 3;
+    } else if (is_version_dir(path)) { /* It's a versioning subdir */
+        stbuf->st_mode = S_IFDIR | 0555;
+        stbuf->st_nlink = 3;
+    } else if (is_versioned_file(path)) {
+        //it should be the {name}_{id} form, and we just need the id
+        char id[25];
+
+        if (extract_file_version(path, id) && ((len = mongo_file_id_exists_(id, &ctime)) != -1))
+        {
+            stbuf->st_mode = S_IFREG | 0555;
+            stbuf->st_nlink = 1;
+            stbuf->st_size = len;
+            stbuf->st_ctime = stbuf->st_mtime = ctime;
+        }
+        else
+           return -ENOENT; 
     } else if ((len = mongo_file_exists_(path, &ctime)) != -1) { /* The file that we have. */
         stbuf->st_mode = S_IFREG | 0777;
         stbuf->st_nlink = 1;
@@ -87,7 +154,19 @@ hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     filler(buf, ".", NULL, 0);           /* Current directory (.)  */
     filler(buf, "..", NULL, 0);          /* Parent directory (..)  */
 
-    mongo_find_file_names_distinct(path, filler, buf);
+    if (! is_version_dir(path))
+    {
+        mongo_find_file_names_distinct(path, filler, buf);
+        filler(buf, VERSION_DIR, NULL, 0);           /* versioning directory  */
+    } else
+    {
+        int real_len = strlen(path) - strlen(VERSION_DIR) - 1; // - "/{VERSION_DIR}"
+        char vp[real_len + 1];
+        memcpy(vp, path, real_len);
+        vp[real_len] = '\0';
+
+        mongo_find_file_names_versions(vp, filler, buf);
+    }
 
     return 0;
 }
