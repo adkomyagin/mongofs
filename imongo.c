@@ -60,7 +60,7 @@ int64_t mongo_file_exists_(const char *file_name, time_t *ctime)
   return len;
 }
 
-int64_t mongo_file_id_exists_(const char *file_id, time_t *ctime)
+int64_t mongo_file_id_exists_(const char *file_id, const char *file_name, time_t *ctime)
 {
   int64_t len = -1;
   gridfile gfile[1];
@@ -68,7 +68,7 @@ int64_t mongo_file_id_exists_(const char *file_id, time_t *ctime)
 
   bson_oid_from_string(oid, file_id);
 
-  if ((gridfs_find_filename_by_id( gfs, oid, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+  if ((gridfs_find_filename_with_id( gfs, oid, file_name, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
   {
     len = gridfile_get_contentlength(gfile);
     if (ctime != NULL)
@@ -77,7 +77,7 @@ int64_t mongo_file_id_exists_(const char *file_id, time_t *ctime)
     gridfile_destroy( gfile );
   }
   else
-    printf("file id not found: %s\n", file_id);
+    printf("file name:id not found: %s : %s\n", file_name, file_id);
 
   return len;
 }

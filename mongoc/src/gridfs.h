@@ -203,7 +203,7 @@ MONGO_EXPORT int gridfs_find_query( gridfs *gfs, const bson *query, gridfile *gf
  */
 MONGO_EXPORT int gridfs_find_filename( gridfs *gfs, const char *filename, const char *contenttype, gridfile *gfile );
 
-MONGO_EXPORT int gridfs_find_filename_by_id(gridfs *gfs, const bson_oid_t *oid, const char *contenttype, gridfile *gfile);
+MONGO_EXPORT int gridfs_find_filename_with_id(gridfs *gfs, const bson_oid_t *oid, const char *filename, const char *contenttype, gridfile *gfile);
 
 /**
  *  Returns whether or not the GridFile exists

@@ -31,7 +31,7 @@ int64_t mongo_write(mongo_fs_handle *fh, const char *filename, const char *buf, 
 int64_t mongo_read(const mongo_fs_handle *fh, char *data, size_t size, off_t offset);
 
 int64_t mongo_file_exists_(const char *file_name, time_t *ctime);
-int64_t mongo_file_id_exists_(const char *file_id, time_t *ctime);
+int64_t mongo_file_id_exists_(const char *file_id, const char *file_name, time_t *ctime);
 int mongo_find_names( fuse_fill_dir_t filler, void *buf );
 int mongo_find_file_names_distinct( const char *path, fuse_fill_dir_t filler, void *buf ); //actually finds dirs too
 

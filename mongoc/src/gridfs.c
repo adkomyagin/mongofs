@@ -448,12 +448,13 @@ MONGO_EXPORT int gridfs_find_filename(gridfs *gfs, const char *filename, const c
   return res;
 }
 
-MONGO_EXPORT int gridfs_find_filename_by_id(gridfs *gfs, const bson_oid_t *oid, const char *contenttype, gridfile *gfile){
+MONGO_EXPORT int gridfs_find_filename_with_id(gridfs *gfs, const bson_oid_t *oid, const char *filename, const char *contenttype, gridfile *gfile){
   bson query[1];
   int res;
 
   bson_init(query);
   bson_append_oid( query, "_id", oid );
+  bson_append_string_uppercase( query, "filename", filename, gfs->caseInsensitive );
   if (contenttype != NULL)
     bson_append_string_uppercase( query, "contentType", contenttype, gfs->caseInsensitive );
   bson_finish(query);

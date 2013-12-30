@@ -53,14 +53,16 @@ static int is_versioned_file(const char *path) //we check if it's something like
     return (0 == strncmp(&(path[off+1]),VERSION_DIR,strlen(VERSION_DIR)));
 }
 
-static int extract_file_version(const char *path, char *id) //we extract the id part from {name}_{id}
+static int extract_file_version_info(const char *path, char *id, char *real_name) 
+//we extract the id part from {name}_{id}
+//also we extract real path here
 {
     char *name = basename(path);
 
     int off = strlen(name) - 1;
 
     //locate the "_"
-    while ((off >= 0) && (path[off] != '_'))
+    while ((off >= 0) && (name[off] != '_'))
         off--;
 
     if (off == 0)
@@ -69,8 +71,15 @@ static int extract_file_version(const char *path, char *id) //we extract the id 
     if (strlen(&(name[off + 1])) != 24)
         return 0;
 
+    //fill id
     memcpy(id,&(name[off + 1]), 24);
     id[24] = '\0';
+
+    //fill full qualified real path ( /../{VERSION_DIR}/{name}_{id} -> /../{name} )
+    int off_dir = strlen(path) - strlen(name) - 1 - strlen(VERSION_DIR);
+    memcpy(real_name, path, off_dir);
+    memcpy(real_name + off_dir, name, off);
+    real_name[off_dir + off] = '\0';
 
     return 1;
 }
@@ -99,8 +108,9 @@ hello_getattr(const char *path, struct stat *stbuf)
     } else if (is_versioned_file(path)) {
         //it should be the {name}_{id} form, and we just need the id
         char id[25];
+        char name[strlen(path)+1];
 
-        if (extract_file_version(path, id) && ((len = mongo_file_id_exists_(id, &ctime)) != -1))
+        if (extract_file_version_info(path, id, name) && ((len = mongo_file_id_exists_(id, name, &ctime)) != -1))
         {
             stbuf->st_mode = S_IFREG | 0555;
             stbuf->st_nlink = 1;
@@ -108,7 +118,10 @@ hello_getattr(const char *path, struct stat *stbuf)
             stbuf->st_ctime = stbuf->st_mtime = ctime;
         }
         else
-           return -ENOENT; 
+        {
+            printf("Failed to extract verion for the file: %s\n", path);
+            return -ENOENT; 
+        }
     } else if ((len = mongo_file_exists_(path, &ctime)) != -1) { /* The file that we have. */
         stbuf->st_mode = S_IFREG | 0777;
         stbuf->st_nlink = 1;
@@ -164,6 +177,8 @@ hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         char vp[real_len + 1];
         memcpy(vp, path, real_len);
         vp[real_len] = '\0';
+
+        printf("Requested version listing for: %s\n", vp);
 
         mongo_find_file_names_versions(vp, filler, buf);
     }
