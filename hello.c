@@ -103,7 +103,7 @@ hello_getattr(const char *path, struct stat *stbuf)
         stbuf->st_mode = S_IFDIR | 0777;
         stbuf->st_nlink = 3;
     } else if (is_version_dir(path)) { /* It's a versioning subdir */
-        stbuf->st_mode = S_IFDIR | 0555;
+        stbuf->st_mode = S_IFDIR | 0777;
         stbuf->st_nlink = 3;
     } else if (is_versioned_file(path)) {
         //it should be the {name}_{id} form, and we need the id and name
@@ -112,7 +112,7 @@ hello_getattr(const char *path, struct stat *stbuf)
 
         if (extract_file_version_info(path, id, name) && ((len = mongo_file_id_exists_(id, name, &ctime)) != -1))
         {
-            stbuf->st_mode = S_IFREG | 0555;
+            stbuf->st_mode = S_IFREG | 0777;
             stbuf->st_nlink = 1;
             stbuf->st_size = len;
             stbuf->st_ctime = stbuf->st_mtime = ctime;
@@ -160,6 +160,9 @@ hello_open(const char *path, struct fuse_file_info *fi)
 
         if (extract_file_version_info(path, id, name))
             fh = mongo_get_file_handle_with_id(id, name);
+
+        if (fh != NULL)
+            fh->is_readonly = 1; //we don't want writes here
     }
     
     if (fh == NULL) /* We only recognize files we have */
@@ -239,6 +242,11 @@ hello_rmdir(const char *path)
     printf("rmdir requested: %s\n", path);
 
     //printf("DID EMPTY: %d\n", mongo_dir_empty( path ));
+    if (is_version_dir(path))
+    {
+        printf ("rejecting removal of version dir\n");
+        return 0; //don't throw errors on user
+    }
 
     if (mongo_dir_empty( path ) == 1)
     {
@@ -258,6 +266,12 @@ hello_write(const char *path, const char *buf, size_t size, off_t offset, struct
 
     mongo_fs_handle *fh = (mongo_fs_handle *)fi->fh;
 
+    if (fh->is_readonly == 1)
+    {
+        printf("write rejected since RO is set\n");
+        return -1;
+    }
+
     if (fh->is_creator == 0)
     {
         fh->is_creator = 1;
@@ -273,7 +287,17 @@ hello_unlink(const char *path)
 {
     printf("file unlink: %s\n", path);
 
-    mongo_unlink(path);
+    if (! is_versioned_file(path)) {
+        mongo_unlink(path);
+    }
+    else
+    {
+        char id[25];
+        char name[strlen(path)+1];
+
+        if (extract_file_version_info(path, id, name))
+            mongo_unlink_id(id,name);
+    }
 
     return 0;
 }
@@ -296,6 +320,31 @@ hello_fsync(const char *path, int isdatasync,
     return 0;
 }
 
+static int
+hello_utimens(const char* path, const struct timespec ts[2])
+{
+    printf("file utimens: %s\n", path);
+    int res = -1;
+
+    if ( is_versioned_file(path)) {
+        char id[25];
+        char name[strlen(path)+1];
+
+        if (extract_file_version_info(path, id, name))
+            res = mongo_update_time(name, id, ts);
+    }
+    else
+    {
+        //res = mongo_update_time(path, NULL, ts);
+        printf("utimens is not supported for non-versioned files\n"); //we don't really support it
+        res = -1;
+    }
+
+    printf("utimens result: %d\n", res);
+
+    return res;
+}
+
 static struct fuse_operations hello_filesystem_operations = {
     .getattr = hello_getattr, /* To provide size, permissions, etc. */
     .open    = hello_open,    /* To enforce read-only access.       */
@@ -307,7 +356,8 @@ static struct fuse_operations hello_filesystem_operations = {
     .release = hello_release,
     .fsync   = hello_fsync,
     .mkdir   = hello_mkdir,
-    .rmdir   = hello_rmdir
+    .rmdir   = hello_rmdir,
+    .utimens = hello_utimens
 };
 
 int

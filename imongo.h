@@ -6,6 +6,7 @@
 typedef struct {
 	gridfile gfile[1];
 	char is_creator;
+	char is_readonly;
 } mongo_fs_handle;
 
 
@@ -41,11 +42,14 @@ int mongo_find_file_names_versions( const char *path, fuse_fill_dir_t filler, vo
 
 //int64_t mongo_write(const char *filename, const char *buf, size_t size, off_t offset);
 int mongo_unlink(const char *filename);
+int mongo_unlink_id(const char *file_id, const char *filename);
 int mongo_mkdir(const char *dirname);
 
 int64_t mongo_dir_exists_(const char *dir_name, time_t *ctime);
 int mongo_dir_empty( const char *path );
 
 int mongo_create_file(mongo_fs_handle *fh, const char *filename);
+
+int mongo_update_time(const char *filename, const char *file_id, const struct timespec ts[2]);
 
 

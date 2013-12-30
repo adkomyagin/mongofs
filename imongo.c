@@ -121,6 +121,59 @@ mongo_fs_handle* mongo_get_file_handle_with_id(const char *file_id, const char *
   return handle;
 }
 
+int mongo_update_time(const char *file_name, const char *file_id, const struct timespec ts[2])
+{
+  int64_t len = -1;
+  gridfile gfile[1];
+
+  bson_oid_t oid[1];
+
+  if (file_id == NULL)
+  {
+    if ((gridfs_find_filename( gfs, file_name, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+      *oid = gridfile_get_id( gfile );
+    else
+      return -1;
+  }
+  else
+  {
+    bson_oid_from_string(oid, file_id);
+
+    if ((gridfs_find_filename_with_id( gfs, oid, file_name, FILE_CT, gfile ) == MONGO_OK) && (gridfile_exists( gfile )))
+    {
+      //ok
+    }
+    else
+      return -1;
+  }
+
+  gridfile_destroy( gfile );
+
+  bson ret[1];
+  bson q[1];
+  int result;
+  int64_t d;
+
+  bson_init(ret);
+  bson_append_start_object( ret, "$set" );
+    //get mtime
+    d = ts[1].tv_sec*1000;// + ts[0].tv_nsec / 1000;
+    bson_append_date(ret, "uploadDate", d);
+  bson_append_finish_object( ret );
+  bson_finish(ret);
+
+  bson_init(q);
+  bson_append_oid(q, "_id", oid);
+  bson_finish(q);
+
+  result = mongo_update(gfs->client, gfs->files_ns, q, ret, 0, NULL);
+
+  bson_destroy(ret);
+  bson_destroy(q);
+
+  return (result == MONGO_OK) ? 0 : -1;
+}
+
 void mongo_destroy_file_handle(mongo_fs_handle *fh)
 {
   if (fh == NULL)
@@ -361,12 +414,44 @@ int64_t mongo_read(const mongo_fs_handle *fh, char *data, size_t size, off_t off
     //ASSERT(bytes_read == len);
   gridfile_seek(gfile, 0); //restore the initial position
 
-  return len;
+  return size;
 }
 
 int mongo_unlink(const char *filename)
 {
     return gridfs_remove_filename(gfs, filename);
+}
+
+int mongo_unlink_id(const char *file_id, const char *filename)
+{
+    bson b[1];
+    int res;
+
+    bson_oid_t oid[1];
+    bson_oid_from_string(oid, file_id);
+
+    /* Remove the file with the specified id */
+    bson_init(b);
+    bson_append_oid(b, "_id", oid);
+    bson_append_string(b, "filename", filename);
+    bson_finish(b);
+    res = (mongo_remove(gfs->client, gfs->files_ns, b, NULL) == MONGO_OK);
+    bson_destroy(b);
+
+    if (! res)
+    {
+      printf ("failed to remove %s:%s. Does it exist?\n", file_id, filename);
+      return -1;
+    }
+
+    /* Remove all chunks from the file with the specified id */
+    bson_init(b);
+    bson_append_oid(b, "files_id", oid);
+    bson_finish(b);
+    res = (mongo_remove(gfs->client, gfs->chunks_ns, b, NULL) == MONGO_OK);
+    bson_destroy(b);
+
+    return res;
 }
 
 /*
