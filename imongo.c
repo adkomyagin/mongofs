@@ -100,6 +100,27 @@ mongo_fs_handle* mongo_get_file_handle(const char *file_name)
   return handle;
 }
 
+mongo_fs_handle* mongo_get_file_handle_with_id(const char *file_id, const char *file_name)
+{
+  mongo_fs_handle *handle = (mongo_fs_handle *)calloc(1, sizeof(mongo_fs_handle));
+
+  bson_oid_t oid[1];
+  bson_oid_from_string(oid, file_id);
+
+  if ((gridfs_find_filename_with_id( gfs, oid, file_name, FILE_CT, handle->gfile ) == MONGO_OK) && (gridfile_exists( handle->gfile )))
+  {
+    //it's ok
+  }
+  else
+  {
+    printf("file not found: %s\n", file_name);
+    free(handle);
+    handle = NULL;
+  }
+
+  return handle;
+}
+
 void mongo_destroy_file_handle(mongo_fs_handle *fh)
 {
   if (fh == NULL)

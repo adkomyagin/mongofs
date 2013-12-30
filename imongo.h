@@ -23,6 +23,7 @@ int mongo_destroy_gfs();
 int mongo_init_gfs(const char *server, int port);
 
 mongo_fs_handle* mongo_get_file_handle(const char *file_name);
+mongo_fs_handle* mongo_get_file_handle_with_id(const char *file_id, const char *file_name);
 mongo_fs_handle* mongo_create_file_handle();
 void mongo_reset_file_handle(mongo_fs_handle *fh);
 void mongo_destroy_file_handle(mongo_fs_handle *fh);

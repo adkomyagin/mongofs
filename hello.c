@@ -106,7 +106,7 @@ hello_getattr(const char *path, struct stat *stbuf)
         stbuf->st_mode = S_IFDIR | 0555;
         stbuf->st_nlink = 3;
     } else if (is_versioned_file(path)) {
-        //it should be the {name}_{id} form, and we just need the id
+        //it should be the {name}_{id} form, and we need the id and name
         char id[25];
         char name[strlen(path)+1];
 
@@ -148,7 +148,20 @@ hello_getattr(const char *path, struct stat *stbuf)
 static int
 hello_open(const char *path, struct fuse_file_info *fi)
 {
-    mongo_fs_handle *fh = mongo_get_file_handle(path);
+    mongo_fs_handle *fh = NULL;
+
+    if (! is_versioned_file(path)) {
+        fh = mongo_get_file_handle(path);
+    }
+    else
+    {
+        char id[25];
+        char name[strlen(path)+1];
+
+        if (extract_file_version_info(path, id, name))
+            fh = mongo_get_file_handle_with_id(id, name);
+    }
+    
     if (fh == NULL) /* We only recognize files we have */
         return -ENOENT;
 
