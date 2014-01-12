@@ -345,6 +345,35 @@ hello_utimens(const char* path, const struct timespec ts[2])
     return res;
 }
 
+static int
+hello_ftruncate(const char *path, off_t size, struct fuse_file_info *fi)
+{
+    printf("ftruncate requested: %s, size: %d. handle: 0x%X\n", path, size, fi->fh);
+
+    if (size != 0)
+    {
+        printf("can't truncate to non-zero!\n");
+        return -1;
+    }
+
+    mongo_fs_handle *fh = (mongo_fs_handle *)fi->fh;
+
+    if (fh->is_readonly == 1)
+    {
+        printf("ftruncate rejected since RO is set\n");
+        return -1;
+    }
+
+    fh->is_creator = 1;
+    printf("ftruncate had set creator mode\n");
+
+    mongo_reset_file_handle(fh);
+    mongo_create_file(fh, path);
+
+    return 0;
+}
+
+
 static struct fuse_operations hello_filesystem_operations = {
     .getattr = hello_getattr, /* To provide size, permissions, etc. */
     .open    = hello_open,    /* To enforce read-only access.       */
@@ -357,7 +386,8 @@ static struct fuse_operations hello_filesystem_operations = {
     .fsync   = hello_fsync,
     .mkdir   = hello_mkdir,
     .rmdir   = hello_rmdir,
-    .utimens = hello_utimens
+    .utimens = hello_utimens,
+    .ftruncate = hello_ftruncate
 };
 
 int
