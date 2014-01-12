@@ -1,7 +1,7 @@
 mongofs
 =======
 
-Experimental FUSE-based FS backed by MongoDB GridFS
+Experimental (POC) FUSE-based FS backed by MongoDB GridFS
 
 to build: sh build.sh
 
@@ -16,7 +16,7 @@ Notes:
 3. subdirectories support is implemented through the special "dir"
 contentType
 
-4. versioning support is very experimental
+4. versioning support
   - each process that writes to the file creates a new version of the file
   - on open/getattr we are always accessing the latest version
   - all versions for all the files within a dir are available in the 'versions' subdirectory
@@ -27,3 +27,9 @@ contentType
 
 5. I'm using OS X FUSE that should be compatible with Linux, but
 I have not tested the app on any other OS yet.
+
+6. Although C++/C/Python append works fine, Bash ">>" operator doesn't append but 
+instead overwrites the file from the beginning.
+
+7. I spotted a few rare segfaults when I was heavily using vim with its' swap files,
+ so vim is not my friend :(
